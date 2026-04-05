@@ -120,9 +120,18 @@ class DouYinCrawler(AbstractCrawler):
         if config.CRAWLER_MAX_NOTES_COUNT < dy_limit_count:
             config.CRAWLER_MAX_NOTES_COUNT = dy_limit_count
         start_page = config.START_PAGE  # start page number
-        for keyword in config.KEYWORDS.split(","):
+        keywords = config.KEYWORDS.split(",")
+        for idx, keyword in enumerate(keywords):
             source_keyword_var.set(keyword)
-            utils.logger.info(f"[DouYinCrawler.search] Current keyword: {keyword}")
+            utils.logger.info(f"[DouYinCrawler.search] Current keyword ({idx+1}/{len(keywords)}): {keyword}")
+
+            # Navigate browser to search page to simulate real user behavior
+            try:
+                search_url = f"https://www.douyin.com/search/{keyword}?type=general"
+                await self.context_page.goto(search_url)
+                await asyncio.sleep(random.uniform(3, 5))
+            except Exception as e:
+                utils.logger.warning(f"[DouYinCrawler.search] Navigate to search page failed: {e}")
             aweme_list: List[str] = []
             page = 0
             dy_search_id = ""
@@ -169,6 +178,14 @@ class DouYinCrawler(AbstractCrawler):
                 await asyncio.sleep(config.CRAWLER_MAX_SLEEP_SEC)
                 utils.logger.info(f"[DouYinCrawler.search] Sleeping for {config.CRAWLER_MAX_SLEEP_SEC} seconds after page {page-1}")
             utils.logger.info(f"[DouYinCrawler.search] keyword:{keyword}, aweme_list:{aweme_list}")
+
+            # Sleep between keywords to avoid rate limiting
+            if idx < len(keywords) - 1:
+                sleep_time = random.uniform(8, 15)
+                utils.logger.info(f"[DouYinCrawler.search] Sleeping {sleep_time:.1f}s before next keyword...")
+                await asyncio.sleep(sleep_time)
+                # Refresh cookies between keyword searches
+                await self.dy_client.update_cookies(browser_context=self.browser_context)
 
     async def get_specified_awemes(self):
         """Get the information and comments of the specified post from URLs or IDs"""
